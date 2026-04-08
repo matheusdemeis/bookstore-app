@@ -1,8 +1,151 @@
-<span role="button" class="position-relative fs-4 fw-bold
-    data-bs-toggle=offcanvas" data-bs-target="#cart">
-<i class="bi bi-cart"></i>
-</span>
+@using Microsoft.EntityFrameworkCore
+@inject OrderState OrderState
+@inject IDbContextFactory<BookstoreDb> DbFactory
+@inject NavigationManager NavigationManager
+@implements IDisposable
 
-<div class=>
+<button type="button"
+        class="btn btn-link position-relative fs-4 text-dark p-0"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#cart"
+        aria-controls="cart">
+    <i class="bi bi-cart"></i>
+    @if (OrderState.TotalQuantity > 0)
+    {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+            @OrderState.TotalQuantity
+        </span>
+    }
+</button>
 
+<div class="offcanvas offcanvas-end" tabindex="-1" id="cart" aria-labelledby="cartLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="cartLabel">Cart</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column">
+        @if (!OrderState.Items.Any())
+        {
+            <p class="text-muted">Your cart is empty.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-3">
+                @foreach (var item in OrderState.Items)
+                {
+                    <CartItem Item="item"
+                              Increase="HandleIncrease"
+                              Decrease="HandleDecrease"
+                              Remove="HandleRemove" />
+                }
+            </ul>
+
+            <div class="mt-auto">
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>Total:</strong>
+                    <strong>@OrderState.TotalPrice.ToString("C")</strong>
+                </div>
+                <button class="btn btn-primary w-100"
+                        @onclick="CheckoutAsync"
+                        disabled="@isCheckingOut">
+                    @(isCheckingOut ? "Placing order..." : "Checkout")
+                </button>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <p class="text-danger mt-3 mb-0">@errorMessage</p>
+        }
+    </div>
 </div>
+
+@code {
+    private bool isCheckingOut;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        OrderState.OnChange += HandleStateChange;
+    }
+
+    private void HandleIncrease(int bookId) => OrderState.IncreaseQuantity(bookId);
+
+    private void HandleDecrease(int bookId) => OrderState.DecreaseQuantity(bookId);
+
+    private void HandleRemove(int bookId) => OrderState.RemoveItem(bookId);
+
+    private async Task CheckoutAsync()
+    {
+        if (!OrderState.Items.Any() || isCheckingOut)
+        {
+            return;
+        }
+
+        isCheckingOut = true;
+        errorMessage = null;
+
+        try
+        {
+            await using var context = await DbFactory.CreateDbContextAsync();
+
+            var bookIds = OrderState.Items
+                .Select(item => item.Book?.Id ?? 0)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            var books = await context.Books
+                .Where(book => bookIds.Contains(book.Id))
+                .ToDictionaryAsync(book => book.Id);
+
+            var order = new Order
+            {
+                OrderDate = DateTime.UtcNow
+            };
+
+            foreach (var cartItem in OrderState.Items)
+            {
+                var bookId = cartItem.Book?.Id ?? 0;
+
+                if (books.TryGetValue(bookId, out var book))
+                {
+                    order.OrderItems.Add(new OrderItem
+                    {
+                        Book = book,
+                        Quantity = cartItem.Quantity
+                    });
+                }
+            }
+
+            if (!order.OrderItems.Any())
+            {
+                errorMessage = "No valid books found to place an order.";
+                return;
+            }
+
+            context.Orders.Add(order);
+            await context.SaveChangesAsync();
+
+            OrderState.ResetOrder();
+            NavigationManager.NavigateTo("/myorders");
+        }
+        catch
+        {
+            errorMessage = "Unable to place your order right now.";
+        }
+        finally
+        {
+            isCheckingOut = false;
+        }
+    }
+
+    private void HandleStateChange()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        OrderState.OnChange -= HandleStateChange;
+    }
+}

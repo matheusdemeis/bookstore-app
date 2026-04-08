@@ -1,0 +1,30 @@
+@using Bookstore.Models
+
+<li class="list-group-item">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+        <div class="me-2">
+            <div class="fw-semibold">@Item.Book?.Title</div>
+            <small class="text-muted">@Item.Book?.Price.ToString("C") each</small>
+        </div>
+        <div class="text-end">
+            <div class="btn-group btn-group-sm mb-1" role="group">
+                <button class="btn btn-outline-secondary" @onclick="OnDecrease">-</button>
+                <button class="btn btn-outline-secondary disabled">@Item.Quantity</button>
+                <button class="btn btn-outline-secondary" @onclick="OnIncrease">+</button>
+            </div>
+            <div class="small">@Item.GetTotal().ToString("C")</div>
+            <button class="btn btn-link text-danger p-0 small" @onclick="OnRemove">Remove</button>
+        </div>
+    </div>
+</li>
+
+@code {
+    [Parameter, EditorRequired] public OrderItem Item { get; set; } = default!;
+    [Parameter] public EventCallback<int> Increase { get; set; }
+    [Parameter] public EventCallback<int> Decrease { get; set; }
+    [Parameter] public EventCallback<int> Remove { get; set; }
+
+    private Task OnIncrease() => Increase.InvokeAsync(Item.Book?.Id ?? 0);
+    private Task OnDecrease() => Decrease.InvokeAsync(Item.Book?.Id ?? 0);
+    private Task OnRemove() => Remove.InvokeAsync(Item.Book?.Id ?? 0);
+}

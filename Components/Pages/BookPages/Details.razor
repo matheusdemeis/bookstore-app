@@ -3,6 +3,7 @@
 @using Bookstore.Models
 @inject IDbContextFactory<Bookstore.Data.BookstoreDb> DbFactory
 @inject NavigationManager NavigationManager
+@inject OrderState OrderState
 
 <PageTitle>Bookstore - Details @(book?.Title ?? "Loading...")</PageTitle>
 
@@ -57,18 +58,13 @@
                                 Back to List
                             </a>
                             <button class="btn btn-warning"
-                                    @onclick="PurchaseBookAsync"
-                                    disabled="@isPurchasing">
-                                @(isPurchasing ? "Purchasing..." : "Purchase")
+                                    @onclick="AddToCart">
+                                Add To Cart
                             </button>
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(purchaseMessage))
+                        @if (!string.IsNullOrWhiteSpace(cartMessage))
                         {
-                            <p class="mt-3 mb-0 text-success">@purchaseMessage</p>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(purchaseError))
-                        {
-                            <p class="mt-3 mb-0 text-danger">@purchaseError</p>
+                            <p class="mt-3 mb-0 text-success">@cartMessage</p>
                         }
                     </div>
                 </div>
@@ -79,9 +75,7 @@
 
 @code {
     private Book? book;
-    private bool isPurchasing;
-    private string? purchaseMessage;
-    private string? purchaseError;
+    private string? cartMessage;
 
     [SupplyParameterFromQuery]
     private int Id { get; set; }
@@ -97,54 +91,14 @@
         }
     }
 
-    private async Task PurchaseBookAsync()
+    private void AddToCart()
     {
-        if (book is null || isPurchasing)
+        if (book is null)
         {
             return;
         }
 
-        isPurchasing = true;
-        purchaseMessage = null;
-        purchaseError = null;
-
-        try
-        {
-            await using var context = await DbFactory.CreateDbContextAsync();
-            var selectedBook = await context.Books.FirstOrDefaultAsync(b => b.Id == book.Id);
-
-            if (selectedBook is null)
-            {
-                purchaseError = "This book could not be found.";
-                return;
-            }
-
-            var order = new Order
-            {
-                OrderDate = DateTime.UtcNow,
-                OrderItems = new List<OrderItem>
-                {
-                    new()
-                    {
-                        Book = selectedBook,
-                        Quantity = 1
-                    }
-                }
-            };
-
-            context.Orders.Add(order);
-            await context.SaveChangesAsync();
-
-            purchaseMessage = "Order placed successfully.";
-            NavigationManager.NavigateTo("/myorders");
-        }
-        catch
-        {
-            purchaseError = "Unable to place your order right now.";
-        }
-        finally
-        {
-            isPurchasing = false;
-        }
+        OrderState.AddBook(book, 1);
+        cartMessage = "Book added to cart.";
     }
 }

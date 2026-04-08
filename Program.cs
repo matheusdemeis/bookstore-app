@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Bookstore.Data;
 using Bookstore.Components;
+using Bookstore.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,7 @@ sqlServerOptions.EnableRetryOnFailure(
     errorNumbersToAdd: null)));
 
 builder.Services.AddQuickGridEntityFrameworkAdapter();
+builder.Services.AddScoped<OrderState>();
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 var app = builder.Build();
