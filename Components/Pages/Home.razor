@@ -1,12 +1,22 @@
 ﻿@page "/"
 @using Microsoft.EntityFrameworkCore
 @inject IDbContextFactory<BookstoreDb> DbFactory
-@implements IAsyncDisposable
 
 <PageTitle>Bookstore - Home</PageTitle>
 
 <div class="row mt-5 mx-auto">
     <div class="col">
+    <div class="d-flex justify-content-end mb-3">
+        <label class="me-2 align-self-center" for="sortByPrice">Sort by:</label>
+        <select id="sortByPrice"
+                class="form-select w-auto"
+                @bind="selectedSort"
+                @bind:after="LoadBooksAsync">
+            <option value="none">Price</option>
+            <option value="low">Low Price</option>
+            <option value="high">High Price</option>
+        </select>
+    </div>
     @if (books is null)
     {
         <p>Loading...</p>
@@ -24,14 +34,28 @@
 </div>
 
 @code {
-    private BookstoreDb context;
-    private List<Book> books;
+    private List<Book> books = new();
+    private string selectedSort = "none";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        context = DbFactory.CreateDbContext();
-        books = context.Books.AsNoTracking().ToList();
+        await LoadBooksAsync();
     }
 
-    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+    private async Task LoadBooksAsync()
+    {
+        await using var context = await DbFactory.CreateDbContextAsync();
+        IQueryable<Book> query = context.Books.AsNoTracking();
+
+        if (selectedSort == "low")
+        {
+            query = query.OrderBy(book => book.Price);
+        }
+        else if (selectedSort == "high")
+        {
+            query = query.OrderByDescending(book => book.Price);
+        }
+
+        books = await query.ToListAsync();
+    }
 }

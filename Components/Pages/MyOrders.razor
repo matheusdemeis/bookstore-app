@@ -1,0 +1,63 @@
+@page "/myorders"
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<BookstoreDb> DbFactory
+
+<PageTitle>Bookstore - My Orders</PageTitle>
+
+<div class="container py-4">
+    <h1 class="mb-4">My Orders</h1>
+
+    @if (orders is null)
+    {
+        <p>Loading orders...</p>
+    }
+    else if (!orders.Any())
+    {
+        <p class="text-muted">You have not placed any orders yet.</p>
+    }
+    else
+    {
+        @foreach (var order in orders)
+        {
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Order #@order.Id</h5>
+                    <p class="card-text mb-3">
+                        <strong>Placed:</strong> @order.OrderDate.ToString("MMM dd, yyyy h:mm tt")
+                    </p>
+
+                    <ul class="list-group list-group-flush mb-3">
+                        @foreach (var item in order.OrderItems)
+                        {
+                            <li class="list-group-item px-0 d-flex justify-content-between">
+                                <span>@(item.Book?.Title ?? "Unknown Book")</span>
+                                <span>Qty: @item.Quantity</span>
+                                <span>@item.GetTotal().ToString("C")</span>
+                            </li>
+                        }
+                    </ul>
+
+                    <p class="mb-0">
+                        <strong>Total:</strong> @order.GetTotal().ToString("C")
+                    </p>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Order>? orders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = await DbFactory.CreateDbContextAsync();
+
+        orders = await context.Orders
+            .AsNoTracking()
+            .Include(order => order.OrderItems)
+            .ThenInclude(item => item.Book)
+            .OrderByDescending(order => order.OrderDate)
+            .ToListAsync();
+    }
+}
