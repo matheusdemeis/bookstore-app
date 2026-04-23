@@ -1,0 +1,51 @@
+@page "/genre/{Genre}"
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<BookstoreDb> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Bookstore - Genre @GenreDisplay</PageTitle>
+
+<div class="row mt-5 mx-auto">
+    <div class="col">
+        <h1 class="mb-4">Genre: @GenreDisplay</h1>
+
+        @if (books is null)
+        {
+            <p>Loading...</p>
+        }
+        else
+        {
+            <div class="hstack flex-wrap">
+                @foreach (var book in books)
+                {
+                    <BookCard Book="@book" />
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? Genre { get; set; }
+
+    private string GenreDisplay { get; set; } = string.Empty;
+    private List<Book>? books;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        GenreDisplay = (Genre ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(GenreDisplay))
+        {
+            NavigationManager.NotFound();
+            return;
+        }
+
+        await using var context = await DbFactory.CreateDbContextAsync();
+        books = await context.Books
+            .AsNoTracking()
+            .Where(book => book.Genre != null && book.Genre.Trim() == GenreDisplay)
+            .ToListAsync();
+    }
+}

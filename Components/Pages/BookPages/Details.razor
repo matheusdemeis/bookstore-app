@@ -1,6 +1,7 @@
 @page "/books/details"
 @using Microsoft.EntityFrameworkCore
 @using Bookstore.Models
+@using System
 @inject IDbContextFactory<Bookstore.Data.BookstoreDb> DbFactory
 @inject NavigationManager NavigationManager
 @inject OrderState OrderState
@@ -32,7 +33,16 @@
 
                         <dl class="row mb-4">
                             <dt class="col-sm-4">Genre</dt>
-                            <dd class="col-sm-8">@book.Genre</dd>
+                            <dd class="col-sm-8">
+                                @if (string.IsNullOrWhiteSpace(book.Genre))
+                                {
+                                    <span>-</span>
+                                }
+                                else
+                                {
+                                    <a href="@($"/genre/{Uri.EscapeDataString(book.Genre.Trim())}")">@book.Genre</a>
+                                }
+                            </dd>
 
                             <dt class="col-sm-4">Publisher</dt>
                             <dd class="col-sm-8">@book.Publisher</dd>
